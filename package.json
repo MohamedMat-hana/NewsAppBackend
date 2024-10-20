@@ -4,9 +4,13 @@
   "description": "News App Backend.",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start":"node server.js"
   },
   "author": "MM",
+  "engines": {
+    "node":"20.11.1"
+  },
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
