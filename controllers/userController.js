@@ -6,16 +6,20 @@ const registerUser = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
     const userExists = await User.findOne({ email });
-    if (userExists && userExists.active) {
-      return res.status(400).json({
-        success: false,
-        msg: "User already exists",
-      });
-    } else if (!userExists && !userExists.active) {
-      return res.status(400).json({
-        success: false,
-        msg: "account is here but need to active",
-      });
+
+    // Check if user already exists
+    if (userExists) {
+      if (userExists.active) {
+        return res.status(400).json({
+          success: false,
+          msg: "User already exists",
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          msg: "Account exists but needs to be activated",
+        });
+      }
     }
 
     const user = new User({
@@ -24,38 +28,42 @@ const registerUser = async (req, res, next) => {
       password,
     });
 
-    crypto.randomBytes(20, function (err, buf) {
+    crypto.randomBytes(20, async function (err, buf) {
+      if (err) return next(err);
+    
       user.activeToken = user._id + buf.toString("hex");
-
       user.activeExpires = Date.now() + 24 * 3600 * 1000;
-      var link =
-        process.env.NODE_ENV == "development"
+    
+      const link =
+        process.env.NODE_ENV === "development"
           ? `http://localhost:${process.env.PORT}/api/users/active/${user.activeToken}`
           : `${process.env.api_host}/api/users/active/${user.activeToken}`;
-      mailer.send({
-        to: req.body.email,
-        subject: "Welcome",
-        html:
-          'please click <a href="' +
-          link +
-          '"> here </a> to active your account. ',
-      });
-      user.save(function (err, user) {
-        if (err) return next(err);
+    
+          mailer.send({
+            to: req.body.email,
+            subject: "Welcome",
+            html: `Please click <a href="${link}"> here </a> to activate your account.`
+          });
+          
+      try {
+        await user.save(); // Now using await for saving
         res.status(201).json({
           success: true,
           msg:
-            "the activation email has been sent to" +
+            "The activation email has been sent to " +
             user.email +
-            ",please click the activation link within 24 hours",
+            ", please click the activation link within 24 hours",
         });
-      });
+      } catch (err) {
+        return next(err);
+      }
     });
+    
   } catch (error) {
     console.log(error);
     res.status(500).json({
       success: false,
-      msg: "server having some issues",
+      msg: "Server having some issues",
     });
   }
 };
