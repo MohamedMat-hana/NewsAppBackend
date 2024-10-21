@@ -17,12 +17,7 @@ app.use(express.urlencoded({ extended: false }));
 
 
 app.use("/api/users",userRoute)
-app.get("/",function(req,res){
-    console.log(req.body);
-    console.log("EndPoint is working");
-    res.json(req.body)
-})
-
+ 
 app.get("*",function(req,res){
     console.log("EndPoint is not working");
     res.status(404).send("EndPoint is not working")

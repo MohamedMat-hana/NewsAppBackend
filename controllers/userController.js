@@ -1,86 +1,64 @@
 const User = require("../models/UserModel");
 const mailer = require("../utils/Mailler");
+const generateToken = require("../utils/generateToken");
 const crypto = require("crypto");
-
 const registerUser = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
-
     const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      if (userExists.active) {
-        return res.status(400).json({
-          success: false,
-          msg: "User already exists",
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          msg: "Account exists but needs to be activated",
-        });
-      }
+    if (userExists && userExists.active) {
+      return res.status(400).json({
+        success: false,
+        msg: "User already exists",
+      });
+    } else if (!userExists && !userExists.active) {
+      return res.status(400).json({
+        success: false,
+        msg: "account is here but need to active",
+      });
     }
 
-    // Create a new user if they don't exist
     const user = new User({
       name,
       email,
       password,
     });
 
-    crypto.randomBytes(20, async (err, buf) => {
-      if (err) {
-        return res.status(500).json({
-          success: false,
-          msg: "Error generating activation token",
-        });
-      }
-
+    crypto.randomBytes(20, function (err, buf) {
       user.activeToken = user._id + buf.toString("hex");
+
       user.activeExpires = Date.now() + 24 * 3600 * 1000;
-
-      const link =
+      var link =
         process.env.NODE_ENV == "development"
-          ? `http://localhost:${process.env.PORT}/api/users/activate/${user.activeToken}`
-          : `${process.env.api_host}/api/users/activate/${user.activeToken}`;
-
-      // Send activation email
-      try {
-        await mailer.send({
-          to: email,
-          subject: "Welcome",
-          html: `Please click <a href="${link}">here</a> to activate your account.`,
-        });
-      } catch (mailError) {
-        return res.status(500).json({
-          success: false,
-          msg: "Error sending activation email",
-        });
-      }
-
-      // Save user
-      try {
-        await user.save();
-        return res.status(201).json({
+          ? `http://localhost:${process.env.PORT}/api/users/active/${user.activeToken}`
+          : `${process.env.api_host}/api/users/active/${user.activeToken}`;
+      mailer.send({
+        to: req.body.email,
+        subject: "Welcome",
+        html:
+          'please click <a href="' +
+          link +
+          '"> here </a> to active your account. ',
+      });
+      user.save(function (err, user) {
+        if (err) return next(err);
+        res.status(201).json({
           success: true,
-          msg: "User registered. Activation email sent.",
+          msg:
+            "the activation email has been sent to" +
+            user.email +
+            ",please click the activation link within 24 hours",
         });
-      } catch (saveError) {
-        return res.status(500).json({
-          success: false,
-          msg: "Error saving user",
-        });
-      }
+      });
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
+    console.log(error);
+    res.status(500).json({
       success: false,
-      msg: "Server having some issues",
+      msg: "server having some issues",
     });
   }
-}
+};
 
 module.exports = {
   registerUser,
