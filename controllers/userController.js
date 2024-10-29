@@ -44,15 +44,13 @@ const registerUser = async (req, res, next) => {
             subject: "Welcome",
             html: `Please click <a href="${link}"> here </a> to activate your account.`
           });
-          
+           
       try {
         await user.save(); // Now using await for saving
         res.status(201).json({
           success: true,
           msg:
-            "The activation email has been sent to " +
-            user.email +
-            ", please click the activation link within 24 hours",
+            "Account created successfully , Please login",
         });
       } catch (err) {
         return next(err);
@@ -67,7 +65,108 @@ const registerUser = async (req, res, next) => {
     });
   }
 };
+const activeToken = async (req, res, next) => {
+  try {
+    const user = await User.findOne({
+      activeToken: req.params.activeToken,
+    });
 
+     if (!user) {
+      return res.status(400).json({
+        success: false,
+        msg: "Your activation link is invalid",
+      });
+    }
+
+     if (user.active) {
+      return res.status(200).json({
+        success: true,
+        msg: "Your account is already active. Please log in to use the app.",
+      });
+    }
+
+    user.active = true;
+    await user.save(); 
+    
+    return res.status(200).json({
+      success: true,
+      msg: "Activation successful.",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const authUser=async(req,res)=>{
+  const{email,password}=req.body;
+  
+  const user=await User.findOne({email});
+  
+  console.log("JWT_SECRET:", process.env.JWT_SECRET); // Add this line temporarily
+
+  if(user&&(await user.matchPassword(password))){
+    return res.json({
+      _id:user.id,
+      name:user.name,
+      email:user.email,
+      avatar:user.avatar,
+      token:generateToken(user._id)
+    }
+  )
+  }else{
+    return res.status(401).json({
+      success:false,
+      msg:"Unauthorized user"
+      })
+  }
+}
+
+const getUserProfile=async(req,res)=>{
+  const user=await User.findById(req.header._id);
+  if(user){
+    return res.json({
+      _id:user.id,
+      name:user.name,
+      email:user.email,
+      avatar:user.avatar,
+      })
+      }
+      else{
+        return res.status(404).json({
+          success:false,
+          msg:"User not found"
+          })
+      }
+}
+
+const updateUserProfile=async(req,res)=>{
+  const user=await User.findById(req.header._id);
+  if(user){
+    user.name=req.body.name||user.name;
+    user.email=req.body.email||user.email;
+    user.avatar=req.body.avatar||user.avatar;
+ 
+
+  const updateUser=await user.save();
+  return res.json({
+    _id:updateUser._id,
+    name:updateUser.name,
+    email:updateUser.email,
+    avatar:updateUser.avatar,
+    token:generateToken(updateUser._id)
+    })
+   }
+   else{
+    return res.status(404).json({
+      success:false,
+      msg:"User not found"
+      })
+   }
+}
 module.exports = {
   registerUser,
+  activeToken,
+  authUser,
+  getUserProfile,
+  updateUserProfile
 };
